@@ -35,6 +35,25 @@ usage(){
    exit 
 }
 
+rawurlencode() {
+  local string="${1}"
+  local strlen=${#string}
+  local encoded=""
+  local pos c o
+
+  for (( pos=0 ; pos<strlen ; pos++ )); do
+     c=${string:$pos:1}
+     case "$c" in
+        [-_.~a-zA-Z0-9] ) o="${c}" ;;
+        * )               printf -v o '%%%02x' "'$c"
+     esac
+     encoded+="${o}"
+  done
+  echo "${encoded}"    # You can either set a return variable (FASTER) 
+  REPLY="${encoded}"   #+or echo the result (EASIER)... or both... :p
+}
+
+
 echo " ******************** Load config ******************** "
 
 if [ -e $CONFIG_FILE ]
@@ -133,11 +152,13 @@ domian_path=${git_address#https://}
 
 if [[ "$git_username" != "" && "$git_password" != "" ]]
 then
-	git_username=${git_username/@/%40}
+	#git_username=${git_username/@/%40}
+	git_username=$( rawurlencode $git_username )
+	git_password=$( rawurlencode $git_password )
 	git_address="https://"$git_username":"$git_password"@"$domian_path
 elif [[ "$git_username" != "" ]]
 then
-	git_username=${git_username/@/%40}
+	git_username=$( rawurlencode $git_username )
 	git_address="https://"$git_username"@"$domian_path
 fi
 
@@ -196,7 +217,17 @@ echo " ******************** Upload to server by ssh Job ******************** "
 		"*password:" { send "$ssh_password\n" }
 	}
 	expect eof
+	catch wait result
+	exit [lindex \$result 3]
 EOF
+
+if [ $? != 0 ]
+then
+	echo ""
+	echo "Upload compressed file to server failed!"
+	exit
+fi
+
 
 echo ""
 echo " ******************** Uncompress and move files Job ******************** "
